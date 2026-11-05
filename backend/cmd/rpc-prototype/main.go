@@ -43,11 +43,11 @@ func run() error {
 
 	addressInput := os.Args[1]
 	// Validate the Ethereum wallet address.
-	if !common.IsHexAddress(addressInput) {
-		return fmt.Errorf("invalid Ethereum wallet address")
+	address, err := validateAddress(addressInput)
+	if err != nil {
+		return err
 	}
 
-	address := common.HexToAddress(addressInput)
 	// Set a 10-second timeout for RPC operations.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -79,6 +79,14 @@ func run() error {
 	fmt.Printf("Balance: %s ETH\n", weiToETH(balanceWei))
 
 	return nil
+}
+
+func validateAddress(input string) (common.Address, error) {
+	if !common.IsHexAddress(input) {
+		return common.Address{}, fmt.Errorf("invalid Ethereum wallet address")
+	}
+
+	return common.HexToAddress(input), nil
 }
 
 func weiToETH(wei *big.Int) string {
