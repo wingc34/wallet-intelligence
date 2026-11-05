@@ -19,56 +19,66 @@ const (
 )
 
 func main() {
+
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "Error:", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	if err := godotenv.Load(); err != nil {
-		exitWithError("failed to load .env file: " + err.Error())
+		return fmt.Errorf("failed to load .env file: %w", err)
 	}
 
 	rpcURL := os.Getenv("SEPOLIA_RPC_URL")
 	if rpcURL == "" {
-		exitWithError("SEPOLIA_RPC_URL is not set")
+		return fmt.Errorf("SEPOLIA_RPC_URL is not set")
 	}
 
-	//check value input number
+	// Validate the number of command-line arguments.
 	if len(os.Args) != 2 {
-		exitWithError("usage: go run ./cmd/rpc-prototype <wallet-address>")
+		return fmt.Errorf("usage: go run ./cmd/rpc-prototype <wallet-address>")
 	}
 
 	addressInput := os.Args[1]
-	// check address valid
+	// Validate the Ethereum wallet address.
 	if !common.IsHexAddress(addressInput) {
-		exitWithError("invalid Ethereum wallet address")
+		return fmt.Errorf("invalid Ethereum wallet address")
 	}
 
 	address := common.HexToAddress(addressInput)
-	// wait 10 sec if no response will cancel
+	// Set a 10-second timeout for RPC operations.
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	client, err := ethclient.DialContext(ctx, rpcURL)
 	if err != nil {
-		exitWithError("failed to connnect to RPC: " + err.Error())
+		return fmt.Errorf("failed to connect to RPC: %w", err)
 	}
 	defer client.Close()
 
 	chainID, err := client.ChainID(ctx)
 	if err != nil {
-		exitWithError("failed to get chain ID: " + err.Error())
+		return fmt.Errorf("failed to get chain ID: %w", err)
 	}
 
 	expectedChainID := big.NewInt(sepoliaChainID)
 	if chainID.Cmp(expectedChainID) != 0 {
-		exitWithError(fmt.Sprintf("wrong network: expected Sepolia (%s), got %s",
-			expectedChainID, chainID))
+		return fmt.Errorf("wrong network: expected Sepolia (%s), got %s",
+			expectedChainID, chainID)
 	}
 
 	balanceWei, err := client.BalanceAt(ctx, address, nil)
 	if err != nil {
-		exitWithError("failed to get wallet balance: " + err.Error())
+		return fmt.Errorf("failed to get wallet balance: %w", err)
 	}
 
 	fmt.Println("Network: Sepolia")
 	fmt.Println("Address:", address.Hex())
 	fmt.Printf("Balance: %s ETH\n", weiToETH(balanceWei))
+
+	return nil
 }
 
 func weiToETH(wei *big.Int) string {
@@ -98,9 +108,4 @@ func weiToETH(wei *big.Int) string {
 	fractionText = strings.TrimRight(fractionText, "0")
 
 	return whole.String() + "." + fractionText
-}
-
-func exitWithError(message string) {
-	fmt.Fprintln(os.Stderr, "Error:", message)
-	os.Exit(1)
 }
