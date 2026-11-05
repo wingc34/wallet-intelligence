@@ -41,3 +41,43 @@ func TestWeiToETH(t *testing.T) {
 		})
 	}
 }
+
+func TestValidateAddress(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		wantAddress string
+		wantErr     bool
+	}{
+		{
+			name:        "valid address",
+			input:       "0x000000000000000000000000000000000000dEaD",
+			wantAddress: "0x000000000000000000000000000000000000dEaD",
+			wantErr:     false,
+		},
+		{
+			name:    "invalid address",
+			input:   "invalid-address",
+			wantErr: true,
+		},
+		{
+			name:    "empty address",
+			input:   "",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			address, err := validateAddress(tt.input)
+
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("valiadateAddress(%q) error = %v, wantErr %v", tt.input, err, tt.wantErr)
+			}
+
+			if !tt.wantErr && address.Hex() != tt.wantAddress {
+				t.Errorf("valiadateAddress(%q) = %s, want %s", tt.input, address.Hex(), tt.wantAddress)
+			}
+		})
+	}
+}
