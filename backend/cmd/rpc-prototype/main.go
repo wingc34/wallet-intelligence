@@ -18,6 +18,10 @@ const (
 	weiPerETH      = 18
 )
 
+type ChainIDProvider interface {
+	ChainID(ctx context.Context) (*big.Int, error)
+}
+
 func main() {
 
 	if err := run(); err != nil {
@@ -58,15 +62,8 @@ func run() error {
 	}
 	defer client.Close()
 
-	chainID, err := client.ChainID(ctx)
-	if err != nil {
-		return fmt.Errorf("failed to get chain ID: %w", err)
-	}
-
-	expectedChainID := big.NewInt(sepoliaChainID)
-	if chainID.Cmp(expectedChainID) != 0 {
-		return fmt.Errorf("wrong network: expected Sepolia (%s), got %s",
-			expectedChainID, chainID)
+	if err := validateChainID(ctx, client); err != nil {
+		return err
 	}
 
 	balanceWei, err := client.BalanceAt(ctx, address, nil)
@@ -87,6 +84,21 @@ func validateAddress(input string) (common.Address, error) {
 	}
 
 	return common.HexToAddress(input), nil
+}
+
+func validateChainID(ctx context.Context, client ChainIDProvider) error {
+	chainID, err := client.ChainID(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get chain ID: %w", err)
+	}
+
+	expectedChainID := big.NewInt(sepoliaChainID)
+	if chainID.Cmp(expectedChainID) != 0 {
+		return fmt.Errorf("wrong network: expected Sepolia (%s), got %s",
+			expectedChainID, chainID)
+	}
+
+	return nil
 }
 
 func weiToETH(wei *big.Int) string {
