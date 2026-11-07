@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"testing"
@@ -12,8 +13,17 @@ type MockChainIDProvider struct {
 	err     error
 }
 
-func (m *MockChainIDProvider) ChainID(ctx context.Context) (*big.Int, error) {
+func (m *MockChainIDProvider) ChainID(_ context.Context) (*big.Int, error) {
 	return m.chainID, m.err
+}
+
+type RPCError struct {
+	Code    int
+	Message string
+}
+
+func (e *RPCError) Error() string {
+	return e.Message
 }
 
 func TestWeiToETH(t *testing.T) {
@@ -133,5 +143,54 @@ func TestValidateChainID(t *testing.T) {
 				t.Errorf("validateChainID() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestValidateChainIDWrappedError(t *testing.T) {
+	originalErr := fmt.Errorf("connection timeout")
+
+	mock := &MockChainIDProvider{
+		chainID: nil,
+		err:     originalErr,
+	}
+
+	err := validateChainID(context.Background(), mock)
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !errors.Is(err, originalErr) {
+		t.Errorf("expected wrapped error to contain original error")
+	}
+}
+
+func TestValidateChainIDWrappedCustomError(t *testing.T) {
+	rpcErr := &RPCError{
+		Code:    429,
+		Message: "rate limit exceeded",
+	}
+
+	mock := &MockChainIDProvider{
+		chainID: nil,
+		err:     rpcErr,
+	}
+
+	err := validateChainID(context.Background(), mock)
+
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+
+	if !errors.As(err, &rpcErr) {
+		t.Fatal("expected RPCError in error chain")
+	}
+
+	if rpcErr.Code != 429 {
+		t.Errorf("expected code 429, got %d", rpcErr.Code)
+	}
+
+	if rpcErr.Message != "rate limit exceeded" {
+		t.Errorf("unexpected message: %s", rpcErr.Message)
 	}
 }
